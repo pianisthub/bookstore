@@ -1,0 +1,114 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: 'BookstoreApi/**'
+  pull_request:
+    branches: [ main ]
+    paths: 'BookstoreApi/**'
+
+env:
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: ./BookstoreApi/Bookstore.Api
+
+    - name: Build
+      run: dotnet build --no-restore
+      working-directory: ./BookstoreApi/Bookstore.Api
+
+    - name: Run tests
+      run: dotnet test --no-build --verbosity normal
+      working-directory: ./BookstoreApi/Bookstore.Api
+      # Note: If you don't have tests yet, this step might fail. You can comment it out if needed
+
+  deploy-staging:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: ./BookstoreApi/Bookstore.Api
+
+    - name: Publish application
+      run: dotnet publish -c Release -o ./publish
+      working-directory: ./BookstoreApi/Bookstore.Api
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: backend-publish
+        path: ./BookstoreApi/Bookstore.Api/publish/
+
+    # Add your staging deployment steps here
+    # Example for deployment to Azure App Service:
+    # - name: Deploy to Azure Web App
+    #   uses: azure/webapps-deploy@v2
+    #   with:
+    #     app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+    #     publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+    #     package: ./BookstoreApi/Bookstore.Api/publish
+
+    # Example for deployment to AWS (Elastic Beanstalk):
+    # - name: Configure AWS credentials
+    #   uses: aws-actions/configure-aws-credentials@v4
+    #   with:
+    #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    #     aws-region: ${{ secrets.AWS_REGION }}
+    #
+    # - name: Create deployment package
+    #   run: zip -r bookstore-api.zip .
+    #   working-directory: ./BookstoreApi/Bookstore.Api/publish
+    #
+    # - name: Deploy to Elastic Beanstalk
+    #   run: aws elasticbeanstalk create-application-version --application-name bookstore-api --version-label $GITHUB_SHA --source-bundle S3Bucket=your-bucket,S3Key=bookstore-api.zip && aws elasticbeanstalk update-environment --environment-name bookstore-api-env --version-label $GITHUB_SHA
+
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: backend-publish
+        path: ./publish
+
+    # Add your production deployment steps here
+    # Example for deployment to Azure App Service:
+    # - name: Deploy to Azure Web App Production
+    #   uses: azure/webapps-deploy@v2
+    #   with:
+    #     app-name: ${{ secrets.AZURE_WEBAPP_NAME_PRODUCTION }}
+    #     publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_PRODUCTION }}
+    #     package: ./publish
