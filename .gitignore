@@ -1,0 +1,24 @@
+# Root .gitignore for monorepo
+
+# .NET
+**/bin/
+**/obj/
+**/publish/
+*.zip
+*.exe
+*.pdb
+*.user
+*.vs/
+
+# Node / React
+**/node_modules/
+**/build/
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.vscode/
+.idea/
+*.log
+Thumbs.db
