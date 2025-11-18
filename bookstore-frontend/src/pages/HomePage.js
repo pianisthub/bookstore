@@ -38,7 +38,7 @@ const HomePage = () => {
       <section className="hero">
         <div className="hero-content">
           <h1>Welcome to BookstoreNet</h1>
-          <p>Your one-stop destination for all your reading needs</p>
+          <p>Your one-stop destination for all your reading needs for frontend development</p>
           <button className="cta-button" onClick={handleBrowseBooks}>Browse Books</button>
         </div>
       </section>
