@@ -14,102 +14,88 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: ./bookstore-frontend
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         cache-dependency-path: 'bookstore-frontend/package-lock.json'
-
     - name: Install dependencies
       run: npm ci
-
     - name: Run tests
       run: npm test -- --passWithNoTests --coverage --watchAll=false
-
     - name: Run build
       run: npm run build
-
-    - name: Run linting (if available)
-      run: npm run lint || echo "No lint script found"
 
   deploy-staging:
     needs: test
     runs-on: ubuntu-latest
-    # typical: deploy staging from develop branch — change if you want something else
-    if: github.ref == 'refs/heads/develop'
-
+    if: github.ref == 'refs/heads/develop' # Only runs on develop branch
     defaults:
       run:
         working-directory: ./bookstore-frontend
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         cache-dependency-path: 'bookstore-frontend/package-lock.json'
-
     - name: Install dependencies
       run: npm ci
-
     - name: Build application
       run: npm run build
       env:
         CI: false
-
-    # Deploy to staging S3 (uses same secret pattern — change secret name if you want separate buckets)
-    - name: Configure AWS credentials (staging)
+    
+    # DEPLOYMENT STEPS
+    - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
-
+    
     - name: Deploy to Staging S3
       run: aws s3 sync build/ s3://${{ secrets.FRONTEND_PRODUCTION_BUCKET }} --delete
-      env:
-        AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: frontend-build
-        path: build/
+    # ADDED: CloudFront Invalidation
+    - name: Invalidate CloudFront Cache
+      run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
 
   deploy-production:
-    needs: deploy-staging
+    needs: test # FIXED: Depends on 'test', NOT 'deploy-staging'
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
+    if: github.ref == 'refs/heads/main' # Only runs on main branch
     defaults:
       run:
         working-directory: ./bookstore-frontend
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
       with:
-        name: frontend-build
-        path: build/
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: 'bookstore-frontend/package-lock.json'
+    - name: Install dependencies
+      run: npm ci
+    - name: Build application
+      run: npm run build
+      env:
+        CI: false
 
-    - name: Configure AWS credentials (production)
+    # DEPLOYMENT STEPS
+    - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -118,5 +104,7 @@ jobs:
 
     - name: Deploy to Production S3
       run: aws s3 sync build/ s3://${{ secrets.FRONTEND_PRODUCTION_BUCKET }} --delete
-      env:
-        AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+    # ADDED: CloudFront Invalidation
+    - name: Invalidate CloudFront Cache
+      run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
