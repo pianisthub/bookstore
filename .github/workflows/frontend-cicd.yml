@@ -1,12 +1,17 @@
 name: Frontend CI/CD
 
 on:
+  # Added workflow_dispatch so you can go to Actions tab and click "Run Workflow" manually
+  workflow_dispatch: 
   push:
     branches: [ main, develop ]
-    paths: 'bookstore-frontend/**'
+    paths: 
+      - 'bookstore-frontend/**'
+      - '.github/workflows/**' # Added this so changing the YAML file actually triggers the build
   pull_request:
     branches: [ main ]
-    paths: 'bookstore-frontend/**'
+    paths: 
+      - 'bookstore-frontend/**'
 
 env:
   NODE_VERSION: '20.x'
@@ -36,7 +41,12 @@ jobs:
   deploy-staging:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop' # Only runs on develop branch
+    
+    # --- CHANGE IS HERE ---
+    # I commented this out. Now it will deploy to staging on ANY branch (for testing purposes).
+    # if: github.ref == 'refs/heads/develop' 
+    # ----------------------
+
     defaults:
       run:
         working-directory: ./bookstore-frontend
@@ -56,7 +66,6 @@ jobs:
       env:
         CI: false
     
-    # DEPLOYMENT STEPS
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -67,14 +76,14 @@ jobs:
     - name: Deploy to Staging S3
       run: aws s3 sync build/ s3://${{ secrets.FRONTEND_PRODUCTION_BUCKET }} --delete
 
-    # ADDED: CloudFront Invalidation
     - name: Invalidate CloudFront Cache
       run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
 
   deploy-production:
-    needs: test # FIXED: Depends on 'test', NOT 'deploy-staging'
+    needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' # Only runs on main branch
+    # Keep this strict: Only deploy to production if we are strictly on the MAIN branch
+    if: github.ref == 'refs/heads/main'
     defaults:
       run:
         working-directory: ./bookstore-frontend
@@ -94,7 +103,6 @@ jobs:
       env:
         CI: false
 
-    # DEPLOYMENT STEPS
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -105,6 +113,5 @@ jobs:
     - name: Deploy to Production S3
       run: aws s3 sync build/ s3://${{ secrets.FRONTEND_PRODUCTION_BUCKET }} --delete
 
-    # ADDED: CloudFront Invalidation
     - name: Invalidate CloudFront Cache
       run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
