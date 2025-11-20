@@ -1,19 +1,19 @@
-name: Frontend CI/CD
+name: Frontend Docker ECS Deploy
 
 on:
-  # Added workflow_dispatch so you can go to Actions tab and click "Run Workflow" manually
-  workflow_dispatch: 
+  workflow_dispatch:
   push:
-    branches: [ main, develop ]
-    paths: 
-      - 'bookstore-frontend/**'
-      - '.github/workflows/**' # Added this so changing the YAML file actually triggers the build
-  pull_request:
     branches: [ main ]
     paths: 
       - 'bookstore-frontend/**'
+      - '.github/workflows/**'
 
 env:
+  AWS_REGION: ap-south-1                  # Mumbai
+  ECR_REPOSITORY: bookstore-frontend      
+  ECS_SERVICE: bookstore-service          
+  ECS_CLUSTER: bookstore-cluster          
+  ECS_TASK_DEFINITION: bookstore-task     
   NODE_VERSION: '20.x'
 
 jobs:
@@ -35,83 +35,49 @@ jobs:
       run: npm ci
     - name: Run tests
       run: npm test -- --passWithNoTests --coverage --watchAll=false
-    - name: Run build
-      run: npm run build
 
-  deploy-staging:
+  deploy-ecs:
     needs: test
     runs-on: ubuntu-latest
-    
-    # --- CHANGE IS HERE ---
-    # I commented this out. Now it will deploy to staging on ANY branch (for testing purposes).
-    # if: github.ref == 'refs/heads/develop' 
-    # ----------------------
-
-    defaults:
-      run:
-        working-directory: ./bookstore-frontend
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: 'bookstore-frontend/package-lock.json'
-    - name: Install dependencies
-      run: npm ci
-    - name: Build application
-      run: npm run build
-      env:
-        CI: false
-    
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
-    
-    - name: Deploy to Staging S3
-      run: aws s3 sync build/ s3://${{ secrets.FRONTEND_PRODUCTION_BUCKET }} --delete
-
-    - name: Invalidate CloudFront Cache
-      run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
-
-  deploy-production:
-    needs: test
-    runs-on: ubuntu-latest
-    # Keep this strict: Only deploy to production if we are strictly on the MAIN branch
     if: github.ref == 'refs/heads/main'
     defaults:
       run:
         working-directory: ./bookstore-frontend
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: 'bookstore-frontend/package-lock.json'
-    - name: Install dependencies
-      run: npm ci
-    - name: Build application
-      run: npm run build
-      env:
-        CI: false
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        aws-region: ${{ env.AWS_REGION }}
 
-    - name: Deploy to Production S3
-      run: aws s3 sync build/ s3://${{ secrets.FRONTEND_PRODUCTION_BUCKET }} --delete
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Invalidate CloudFront Cache
-      run: aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }} 
+      run: |
+        # We use --platform linux/amd64 so it doesn't crash on AWS Fargate
+        docker build --platform linux/amd64 -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest .
+        
+        docker tag $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+        
+        docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+        docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+        
+        echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest" >> $GITHUB_OUTPUT
+
+    - name: Update ECS Service
+      # I added this line so the job finishes even if the Service doesn't exist yet.
+      # This allows the Image to get uploaded to ECR so you can finally create the Service manually.
+      continue-on-error: true
+      run: |
+        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE }} --force-new-deployment
