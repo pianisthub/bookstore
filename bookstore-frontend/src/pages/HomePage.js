@@ -37,8 +37,8 @@ const HomePage = () => {
     <div className="homepage">
       <section className="hero">
         <div className="hero-content">
-          <h1>Welcome to BookstoreNet</h1>
-          <p>Your one-stop destination for all your reading needs - served from AWS ECS</p>
+          <h1>Welcome to BookstoreNet - from AWS ECS</h1>
+          <p>Your one-stop destination for all your reading needs </p>
           <button className="cta-button" onClick={handleBrowseBooks}>Browse Books</button>
         </div>
       </section>

@@ -76,8 +76,8 @@ jobs:
         echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest" >> $GITHUB_OUTPUT
 
     - name: Update ECS Service
-      # I added this line so the job finishes even if the Service doesn't exist yet.
-      # This allows the Image to get uploaded to ECR so you can finally create the Service manually.
+      
+      
       continue-on-error: true
       run: |
         aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE }} --force-new-deployment
