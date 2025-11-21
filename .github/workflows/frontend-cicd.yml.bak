@@ -10,10 +10,10 @@ on:
 
 env:
   AWS_REGION: ap-south-1                  # Mumbai
-  ECR_REPOSITORY: bookstore-tf-repo        
-  ECS_SERVICE: bookstore-tf-service        
-  ECS_CLUSTER: bookstore-tf-cluster        
-  ECS_TASK_DEFINITION: bookstore-tf-task   
+  ECR_REPOSITORY: bookstore-frontend      
+  ECS_SERVICE: bookstore-service          
+  ECS_CLUSTER: bookstore-cluster          
+  ECS_TASK_DEFINITION: bookstore-task     
   NODE_VERSION: '20.x'
 
 jobs:
@@ -65,7 +65,7 @@ jobs:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }} 
       run: |
-        # Build for Linux/AMD64 to prevent crashes on Fargate
+        # We use --platform linux/amd64 so it doesn't crash on AWS Fargate
         docker build --platform linux/amd64 -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest .
         
         docker tag $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
@@ -76,6 +76,8 @@ jobs:
         echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest" >> $GITHUB_OUTPUT
 
     - name: Update ECS Service
-       
+      
+      
+      continue-on-error: true
       run: |
         aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE }} --force-new-deployment
