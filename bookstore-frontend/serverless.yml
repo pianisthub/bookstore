@@ -1,0 +1,11 @@
+service: my-react-lambda
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-south-1 # Mumbai
+
+functions:
+  api:
+    handler: server.js.handler
+    events:
+      - httpApi: '*' # Capture trafic
