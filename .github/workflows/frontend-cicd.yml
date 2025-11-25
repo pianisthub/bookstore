@@ -23,6 +23,7 @@ jobs:
           rm -rf node_modules
           rm -rf src
           rm -rf public
+  	  rm -f server.js
 
       # specific stable version
       - name: Install Stable Server Deps
