@@ -5,7 +5,7 @@ provider:
   name: aws
   runtime: nodejs20.x
   region: ap-south-1
-  memorySize: 512 # Give it a bit more RAM
+  memorySize: 512  
   timeout: 10
 
 functions:
@@ -14,7 +14,7 @@ functions:
     events:
       - httpApi: '*'
 
-# FIX: Only include what is absolutely necessary
+ 
 package:
   individually: true
   patterns:

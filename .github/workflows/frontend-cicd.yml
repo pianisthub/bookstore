@@ -13,15 +13,21 @@ jobs:
         with:
           node-version: '20'
       
+       
       - run: npm ci
       - run: npm run build
       
-      
-      - name: Prune Dev Dependencies
-        run: npm prune --production
+       
+      - name: Delete Heavy Dependencies
+        run: rm -rf node_modules
+
+       
+      - name: Install Server Only
+        run: npm install express serverless-http --no-save
 
       
       - run: npm install -g serverless@3
+      
       
       - name: Deploy
         run: serverless deploy
