@@ -16,10 +16,13 @@ jobs:
       - run: npm ci
       - run: npm run build
       
-       
+      
+      - name: Prune Dev Dependencies
+        run: npm prune --production
+
+      
       - run: npm install -g serverless@3
       
-       
       - name: Deploy
         run: serverless deploy
         env:

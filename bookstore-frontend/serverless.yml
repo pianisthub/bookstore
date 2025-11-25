@@ -1,11 +1,25 @@
 service: my-react-lambda
+frameworkVersion: '3' # Force version 3
+
 provider:
   name: aws
   runtime: nodejs20.x
-  region: ap-south-1 # Mumbai
+  region: ap-south-1
+  memorySize: 512 # Give it a bit more RAM
+  timeout: 10
 
 functions:
   api:
     handler: server.js.handler
     events:
-      - httpApi: '*' # Capture trafic
+      - httpApi: '*'
+
+# FIX: Only include what is absolutely necessary
+package:
+  individually: true
+  patterns:
+    - '!**'                 # 1. Exclude EVERYTHING 
+    - 'build/**'            # 2. Include the React 
+    - 'server.js'           # 3. Include the Server 
+    - 'node_modules/**'     # 4. Include dependencies
+    - 'package.json'
