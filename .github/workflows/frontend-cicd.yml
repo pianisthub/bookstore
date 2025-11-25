@@ -13,23 +13,23 @@ jobs:
         with:
           node-version: '20'
       
-      #  Build 
+      # Build 
       - run: npm ci
       - run: npm run build
       
-      #  Clean up 
+      # Clean up 
       - name: Clean up dev files
         run: |
           rm -rf node_modules
           rm -rf src
           rm -rf public
-  	  rm -f server.js
+          rm -f server.js
 
       # specific stable version
       - name: Install Stable Server Deps
         run: npm install express@4.18.2 serverless-http@3.2.0 --save-prod
 
-      # Install Serverless 
+      # Serverless 
       - run: npm install -g serverless@3
       
       # Deploy
